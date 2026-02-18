@@ -1,11 +1,19 @@
 import streamlit as st
 import pandas as pd
 import requests
+import os
 
 # --- CONFIG ---
 LEAGUE_ID = "1312559657998368768"
 
 st.set_page_config(page_title="Dynasty Hub", layout="wide")
+
+# --- AUTO-FIND EXCEL FILE ---
+def find_excel():
+    files = [f for f in os.listdir('.') if f.endswith('.xlsx')]
+    return files[0] if files else None
+
+excel_file = find_excel()
 
 # --- DATA FETCHING ---
 @st.cache_data(ttl=3600)
@@ -15,31 +23,29 @@ def get_sleeper(endpoint):
 # --- APP LAYOUT ---
 st.title("🏆 The Dynasty Command Center")
 
-tab1, tab2, tab3 = st.tabs(["📊 Standings", "📜 League History", "⚖️ Constitution"])
+tab1, tab2 = st.tabs(["📊 Live Standings", "📜 League History"])
 
 with tab1:
-    st.header("Live Sleeper Standings")
-    users = {u['user_id']: u['display_name'] for u in get_sleeper("users")}
-    rosters = get_sleeper("rosters")
-    
-    data = []
-    for r in rosters:
-        data.append({
-            "Manager": users.get(r['owner_id'], "Unknown"),
-            "W-L": f"{r['settings']['wins']}-{r['settings']['losses']}",
-            "Points For": r['settings']['fpts'] + (r['settings']['fpts_decimal'] / 100),
-            "Max PF": r['settings'].get('ppts', 0)
-        })
-    st.table(pd.DataFrame(data).sort_values("Points For", ascending=False))
+    st.header("Live Sleeper Data")
+    try:
+        users = {u['user_id']: u['display_name'] for u in get_sleeper("users")}
+        rosters = get_sleeper("rosters")
+        data = []
+        for r in rosters:
+            data.append({
+                "Manager": users.get(r['owner_id'], "Unknown"),
+                "W-L": f"{r['settings']['wins']}-{r['settings']['losses']}",
+                "Points For": r['settings']['fpts'] + (r['settings']['fpts_decimal'] / 100)
+            })
+        st.table(pd.DataFrame(data).sort_values("Points For", ascending=False))
+    except:
+        st.error("Could not connect to Sleeper. Check your League ID!")
 
 with tab2:
     st.header("Historical Records")
-    try:
-        df = pd.read_excel("league_data.xlsx")
+    if excel_file:
+        st.success(f"Found file: {excel_file}")
+        df = pd.read_excel(excel_file)
         st.dataframe(df, use_container_width=True)
-    except:
-        st.warning("Upload 'league_data.xlsx' to see your history here!")
-
-with tab3:
-    st.header("League Rules")
-    st.write("Current rules are managed in your Excel file.")
+    else:
+        st.error("No Excel file found! Please upload your .xlsx file to GitHub.")
